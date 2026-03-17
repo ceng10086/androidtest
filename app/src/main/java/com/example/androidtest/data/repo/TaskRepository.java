@@ -72,33 +72,46 @@ public class TaskRepository {
 
     public void exportToJson(@NonNull ContentResolver resolver, @NonNull Uri uri, @NonNull ResultCallback callback) {
         writeExecutor.execute(() -> {
-            try (OutputStream os = resolver.openOutputStream(uri);
-                 OutputStreamWriter writer = new OutputStreamWriter(os, StandardCharsets.UTF_8)) {
+            OutputStream os = null;
+            try {
+                os = resolver.openOutputStream(uri);
                 if (os == null) {
                     throw new IllegalStateException("openOutputStream returned null");
                 }
 
-                List<TaskEntity> tasks = taskDao.getAllOnce();
-                ExportPayload payload = ExportPayload.from(tasks);
-                gson.toJson(payload, writer);
-                writer.flush();
-
+                try (OutputStreamWriter writer = new OutputStreamWriter(os, StandardCharsets.UTF_8)) {
+                    List<TaskEntity> tasks = taskDao.getAllOnce();
+                    ExportPayload payload = ExportPayload.from(tasks);
+                    gson.toJson(payload, writer);
+                    writer.flush();
+                }
                 mainHandler.post(callback::onSuccess);
             } catch (Exception e) {
                 mainHandler.post(() -> callback.onError(e));
+            } finally {
+                if (os != null) {
+                    try {
+                        os.close();
+                    } catch (Exception ignored) {
+                    }
+                }
             }
         });
     }
 
     public void importFromJsonOverwrite(@NonNull ContentResolver resolver, @NonNull Uri uri, @NonNull ResultCallback callback) {
         writeExecutor.execute(() -> {
-            try (InputStream is = resolver.openInputStream(uri);
-                 InputStreamReader reader = new InputStreamReader(is, StandardCharsets.UTF_8)) {
+            InputStream is = null;
+            try {
+                is = resolver.openInputStream(uri);
                 if (is == null) {
                     throw new IllegalStateException("openInputStream returned null");
                 }
 
-                ExportPayload payload = gson.fromJson(reader, ExportPayload.class);
+                ExportPayload payload;
+                try (InputStreamReader reader = new InputStreamReader(is, StandardCharsets.UTF_8)) {
+                    payload = gson.fromJson(reader, ExportPayload.class);
+                }
                 if (payload == null || payload.tasks == null) {
                     throw new IllegalArgumentException("Invalid JSON payload");
                 }
@@ -129,6 +142,13 @@ public class TaskRepository {
                 mainHandler.post(callback::onSuccess);
             } catch (Exception e) {
                 mainHandler.post(() -> callback.onError(e));
+            } finally {
+                if (is != null) {
+                    try {
+                        is.close();
+                    } catch (Exception ignored) {
+                    }
+                }
             }
         });
     }
