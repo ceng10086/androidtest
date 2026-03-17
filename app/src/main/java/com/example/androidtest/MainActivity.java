@@ -1,31 +1,33 @@
 package com.example.androidtest;
 
 import android.os.Bundle;
-import android.view.LayoutInflater;
 import android.view.View;
 
 import androidx.activity.EdgeToEdge;
-import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
+import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.androidtest.adapter.TaskAdapter;
-import com.example.androidtest.model.Task;
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.example.androidtest.data.db.TaskEntity;
+import com.example.androidtest.ui.viewmodel.TaskListViewModel;
 import com.google.android.material.snackbar.Snackbar;
-import com.google.android.material.textfield.TextInputEditText;
-import com.google.android.material.textfield.TextInputLayout;
+
+import java.util.Collections;
+import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
 
     private TaskAdapter adapter;
     private View emptyView;
     private View rootView;
+
+    private TaskListViewModel viewModel;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -45,14 +47,26 @@ public class MainActivity extends AppCompatActivity {
         RecyclerView recyclerView = findViewById(R.id.recyclerView);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
 
-        adapter = new TaskAdapter((task, isDone) -> {
-            task.setDone(isDone);
-            int position = adapter.getTasks().indexOf(task);
-            if (position >= 0) {
-                adapter.notifyItemChanged(position);
+        viewModel = new ViewModelProvider(this).get(TaskListViewModel.class);
+
+        adapter = new TaskAdapter(new TaskAdapter.Listener() {
+            @Override
+            public void onDoneToggled(TaskEntity task, boolean isDone) {
+                viewModel.toggleDone(task, isDone);
+            }
+
+            @Override
+            public void onItemClicked(TaskEntity task) {
+                startActivity(EditTaskActivity.createIntent(MainActivity.this, task.id));
             }
         });
         recyclerView.setAdapter(adapter);
+
+        viewModel.getTasks().observe(this, tasks -> {
+            List<TaskEntity> safe = tasks == null ? Collections.emptyList() : tasks;
+            adapter.setTasks(safe);
+            updateEmptyState(safe);
+        });
 
         ItemTouchHelper itemTouchHelper = new ItemTouchHelper(new ItemTouchHelper.SimpleCallback(0,
                 ItemTouchHelper.LEFT | ItemTouchHelper.RIGHT) {
@@ -68,57 +82,21 @@ public class MainActivity extends AppCompatActivity {
                     return;
                 }
 
-                Task removed = adapter.removeAt(position);
-                updateEmptyState();
+                TaskEntity removed = adapter.getTaskAt(position);
+                viewModel.delete(removed);
 
                 Snackbar.make(rootView, R.string.deleted, Snackbar.LENGTH_LONG)
-                        .setAction(R.string.undo, v -> {
-                            adapter.insertAt(position, removed);
-                            updateEmptyState();
-                        })
+                        .setAction(R.string.undo, v -> viewModel.insert(removed))
                         .show();
             }
         });
         itemTouchHelper.attachToRecyclerView(recyclerView);
 
-        findViewById(R.id.fabAdd).setOnClickListener(v -> showAddDialog());
-
-        updateEmptyState();
+        findViewById(R.id.fabAdd).setOnClickListener(v -> startActivity(EditTaskActivity.createIntent(this, 0L)));
     }
 
-    private void updateEmptyState() {
-        boolean isEmpty = adapter == null || adapter.isEmpty();
+    private void updateEmptyState(List<TaskEntity> tasks) {
+        boolean isEmpty = tasks == null || tasks.isEmpty();
         emptyView.setVisibility(isEmpty ? View.VISIBLE : View.GONE);
-    }
-
-    private void showAddDialog() {
-        View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_add_task, null);
-        TextInputLayout titleLayout = dialogView.findViewById(R.id.inputTitleLayout);
-        TextInputEditText titleInput = dialogView.findViewById(R.id.inputTitle);
-        TextInputEditText noteInput = dialogView.findViewById(R.id.inputNote);
-
-        AlertDialog dialog = new MaterialAlertDialogBuilder(this)
-                .setTitle(R.string.add_task)
-                .setView(dialogView)
-                .setNegativeButton(R.string.cancel, null)
-                .setPositiveButton(R.string.save, null)
-                .create();
-
-        dialog.setOnShowListener(d -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
-            String title = titleInput.getText() == null ? "" : titleInput.getText().toString().trim();
-            String note = noteInput.getText() == null ? "" : noteInput.getText().toString().trim();
-            if (title.isEmpty()) {
-                titleLayout.setError(getString(R.string.title_required));
-                return;
-            }
-            titleLayout.setError(null);
-
-            Task task = new Task(System.currentTimeMillis(), title, note, false);
-            adapter.addTask(task);
-            updateEmptyState();
-            dialog.dismiss();
-        }));
-
-        dialog.show();
     }
 }

@@ -5,6 +5,7 @@
     <string name="empty_hint">还没有待办，点击 + 新建</string>
 
     <string name="add_task">新建待办</string>
+    <string name="edit_task">编辑待办</string>
     <string name="task_title_hint">标题（必填）</string>
     <string name="task_note_hint">备注（可选）</string>
     <string name="save">保存</string>
@@ -14,6 +15,8 @@
 
     <string name="deleted">已删除</string>
     <string name="undo">撤销</string>
+
+    <string name="mark_done">标记为完成</string>
 
     <string name="cd_add_task">新建待办</string>
 </resources>

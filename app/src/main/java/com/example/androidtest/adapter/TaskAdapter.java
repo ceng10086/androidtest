@@ -12,7 +12,7 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.androidtest.R;
-import com.example.androidtest.model.Task;
+import com.example.androidtest.data.db.TaskEntity;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -20,43 +20,34 @@ import java.util.List;
 public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder> {
 
     public interface Listener {
-        void onDoneToggled(@NonNull Task task, boolean isDone);
+        void onDoneToggled(@NonNull TaskEntity task, boolean isDone);
+
+        void onItemClicked(@NonNull TaskEntity task);
     }
 
     @NonNull
     private final Listener listener;
 
     @NonNull
-    private final ArrayList<Task> tasks = new ArrayList<>();
+    private final ArrayList<TaskEntity> tasks = new ArrayList<>();
 
     public TaskAdapter(@NonNull Listener listener) {
         this.listener = listener;
     }
 
     @NonNull
-    public List<Task> getTasks() {
+    public List<TaskEntity> getTasks() {
         return tasks;
     }
 
-    public Task getTaskAt(int position) {
+    public TaskEntity getTaskAt(int position) {
         return tasks.get(position);
     }
 
-    public void addTask(@NonNull Task task) {
-        tasks.add(0, task);
-        notifyItemInserted(0);
-    }
-
-    public Task removeAt(int position) {
-        Task removed = tasks.remove(position);
-        notifyItemRemoved(position);
-        return removed;
-    }
-
-    public void insertAt(int position, @NonNull Task task) {
-        int safePos = Math.max(0, Math.min(position, tasks.size()));
-        tasks.add(safePos, task);
-        notifyItemInserted(safePos);
+    public void setTasks(@NonNull List<TaskEntity> newTasks) {
+        tasks.clear();
+        tasks.addAll(newTasks);
+        notifyDataSetChanged();
     }
 
     public boolean isEmpty() {
@@ -92,28 +83,29 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
             textNote = itemView.findViewById(R.id.textNote);
         }
 
-        void bind(@NonNull Task task) {
+        void bind(@NonNull TaskEntity task) {
             checkDone.setOnCheckedChangeListener(null);
 
-            textTitle.setText(task.getTitle());
+            textTitle.setText(task.title);
 
-            if (TextUtils.isEmpty(task.getNote())) {
+            if (TextUtils.isEmpty(task.note)) {
                 textNote.setVisibility(View.GONE);
             } else {
                 textNote.setVisibility(View.VISIBLE);
-                textNote.setText(task.getNote());
+                textNote.setText(task.note);
             }
 
-            checkDone.setChecked(task.isDone());
+            checkDone.setChecked(task.isDone);
 
             int flags = textTitle.getPaintFlags();
-            if (task.isDone()) {
+            if (task.isDone) {
                 textTitle.setPaintFlags(flags | Paint.STRIKE_THRU_TEXT_FLAG);
             } else {
                 textTitle.setPaintFlags(flags & (~Paint.STRIKE_THRU_TEXT_FLAG));
             }
 
             checkDone.setOnCheckedChangeListener((buttonView, isChecked) -> listener.onDoneToggled(task, isChecked));
+            itemView.setOnClickListener(v -> listener.onItemClicked(task));
         }
     }
 }
